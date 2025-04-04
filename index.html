@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <!-- Ensures mobile responsiveness -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Hiyaw Kal Bible</title>
+  <style>
+    /* Reset / Basic styling */
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(to bottom, #f0f4f8, #ffffff);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Main content area */
+    .content {
+      flex: 1; /* fill space above the footer bar */
+      padding: 20px;
+    }
+
+    /*************************************
+     * IMAGE CONTAINER (for pinch + pan)
+     *************************************/
+    #imageContainer {
+      position: relative;
+      width: 100%;
+      max-width: 1200px;
+      height: 75vh;
+      margin: 0 auto;
+      background: #fff;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+
+      /* We handle pinch & pan ourselves, so disable native scroll or zoom gestures */
+      touch-action: none;
+      overflow: hidden; /* no scrollbars, we do custom panning */
+    }
+
+    /* The page image is absolutely positioned (top-left). We transform it for zoom & pan. */
+    #pageImage {
+      position: absolute;
+      top: 0;
+      left: 0;
+      transform-origin: 0 0; /* anchor top-left */
+    }
+
+    /*************************************
+     * FOOTER BAR
+     *************************************/
+    #footerBar {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      background-color: #fff;
+      box-shadow: 0 -2px 4px rgba(0,0,0,0.2);
+      display: flex;
+      align-items: center;
+      justify-content: center; /* center the back, menu, next group */
+      padding: 10px 15px;
+      z-index: 999;
+    }
+
+    /* We'll put About Us on the far right, absolutely or with a spacer approach. */
+    .footerContent {
+      display: flex;
+      align-items: center;
+      gap: 8px; /* space between Back, Menu, Next */
+    }
+
+    /* About us pinned far right */
+    #aboutBtn {
+      position: absolute;
+      right: 15px;
+    }
+
+    #footerBar button {
+      padding: 8px 16px;
+      border: none;
+      outline: none;
+      background-color: #3498db;
+      color: #fff;
+      font-size: 16px;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+    #footerBar button:hover {
+      background-color: #2980b9;
+    }
+
+    /*************************************
+     * MODAL STYLES (Book, Chapter, About)
+     *************************************/
+    .modal {
+      display: none;
+      position: fixed;
+      z-index: 9999;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0,0,0,0.4); /* overlay */
+    }
+
+    .modal-content {
+      background-color: #fff;
+      margin: 5% auto;
+      padding: 20px;
+      width: 300px;
+      border-radius: 8px;
+      position: relative;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+      text-align: center;
+    }
+
+    .closeBtnTop {
+      position: absolute;
+      top: 10px;
+      right: 14px;
+      font-size: 18px;
+      background: none;
+      border: none;
+      cursor: pointer;
+    }
+
+    .closeBtnBottom {
+      position: absolute;
+      bottom: 10px;
+      right: 14px;
+      font-size: 18px;
+      background: none;
+      border: none;
+      cursor: pointer;
+    }
+
+    .modal h2, .modal h3 {
+      color: #333;
+      margin-bottom: 15px;
+    }
+
+    .list-btn {
+      display: block;
+      width: 100%;
+      margin: 6px 0;
+      padding: 8px 12px;
+      text-align: center;
+      border: 1px solid #ddd;
+      background-color: #f9f9f9;
+      cursor: pointer;
+      border-radius: 4px;
+      font-size: 14px;
+    }
+    .list-btn:hover {
+      background-color: #e8f4fa;
+    }
+
+    /* Make the menu (bookList & chapterList) scrollable if too long */
+    #bookList, #chapterList {
+      max-height: 300px;
+      overflow-y: auto;
+    }
+
+    /* LinkedIn icon styling */
+    .linkedin-logo {
+      width: 24px;
+      height: 24px;
+      vertical-align: middle;
+      margin-left: 5px;
+    }
+  </style>
+</head>
+<body>
+  <div class="content">
+    <div id="imageContainer">
+      <!-- The page image is injected by JS as <img id="pageImage"> -->
+    </div>
+  </div>
+
+  <!-- Footer Bar: centered back, menu, next. "About Us" on far right -->
+  <div id="footerBar">
+    <div class="footerContent">
+      <button id="backBtn">Back</button>
+      <button id="menuBtn">Menu</button>
+      <button id="nextBtn">Next</button>
+    </div>
+    <button id="aboutBtn">About Us</button>
+  </div>
+
+  <!-- Book Modal -->
+  <div id="bookModal" class="modal">
+    <div class="modal-content">
+      <button class="closeBtnTop" onclick="closeBookModal()">X</button>
+      <h2>መጽሐፍት ምረጥ (Select a Book)</h2>
+      <div id="bookList"></div>
+    </div>
+  </div>
+
+  <!-- Chapter Modal -->
+  <div id="chapterModal" class="modal">
+    <div class="modal-content">
+      <button class="closeBtnTop" onclick="closeChapterModal()">X</button>
+      <h3>የምድር መጽሐፍት በምዕራፍ ምረጥ (Select Chapter)</h3>
+      <div id="chapterList"></div>
+    </div>
+  </div>
+
+  <!-- About Modal -->
+  <div id="aboutModal" class="modal">
+    <div class="modal-content">
+      <h2>About HiyawKal Bible</h2>
+      <p style="margin-bottom:15px;">
+        This is HiyawKal Bible for your personal spiritual growth
+        and to understand the Bible more.<br/>
+        For any comment, contact us at <b>boazict@gmail.com</b><br/>
+        or on LinkedIn:
+      </p>
+      <p>
+        <a href="https://www.linkedin.com/in/boaz-berhanu-tulu-9405771a5/" target="_blank">
+          <img src="https://cdn-icons-png.flaticon.com/512/174/174857.png" alt="LinkedIn" class="linkedin-logo" />
+          Boaz Berhanu Tulu
+        </a>
+      </p>
+      <button class="closeBtnBottom" onclick="closeAboutModal()">X</button>
+    </div>
+  </div>
+
+  <script>
+    /*********************************************
+     * GLOBAL VARIABLES
+     *********************************************/
+    let bibleData = null;         // entire JSON data
+    let currentPage = 1;          // current displayed page
+    let globalMinPage = Infinity;
+    let globalMaxPage = -Infinity;
+
+    // For custom pinch + pan
+    let scale = 1.0;     // zoom factor
+    let offsetX = 0;     // pan offset X
+    let offsetY = 0;     // pan offset Y
+
+    // Track pointer for dragging
+    let activePointerId = null;
+    let pointerStartX = 0;
+    let pointerStartY = 0;
+    let startOffsetX = 0;
+    let startOffsetY = 0;
+
+    // For pinch
+    let startScale = 1.0;
+    let startDistance = 0;
+
+    // A dictionary to map English book names to Amharic
+    // (You can expand or change as needed)
+    const amharicBookNames = {
+      "Matthew": "ማቴዎስ",
+      "Mark": "ማርቆስ",
+      "Luke": "ሉቃስ",
+      "John": "ዮሃንስ",
+      "Acts": "የሐዋርያት ሥራ",
+      "Romans": "ሮማውያን",
+      "Genesis": "ዘመናት መጀመሪያ",
+      // ... add more mappings as needed ...
+    };
+
+    /*********************************************
+     * ON LOAD
+     *********************************************/
+    window.addEventListener('DOMContentLoaded', () => {
+      fetchBibleData();
+      initGestures();
+    });
+
+    /*********************************************
+     * FETCH & PROCESS BIBLE DATA
+     *********************************************/
+    function fetchBibleData() {
+      fetch('Hiyaw_kal.json')
+        .then(res => {
+          if (!res.ok) {
+            throw new Error("Network response was not ok: " + res.status);
+          }
+          return res.json();
+        })
+        .then(data => {
+          bibleData = data;
+          computeGlobalPageRange();
+          showPage(globalMinPage); // land on the first page in the entire range
+        })
+        .catch(err => {
+          console.error("Error loading JSON:", err);
+          alert("Failed to load JSON. Check console for details.");
+        });
+    }
+
+    function computeGlobalPageRange() {
+      bibleData.forEach(book => {
+        book.chapters.forEach(ch => {
+          if (ch.startPage < globalMinPage) globalMinPage = ch.startPage;
+          if (ch.endPage > globalMaxPage) globalMaxPage = ch.endPage;
+        });
+      });
+      console.log("Global page range:", globalMinPage, globalMaxPage);
+    }
+
+    /*********************************************
+     * SHOW A PAGE
+     *********************************************/
+    function showPage(pageNum) {
+      if (pageNum < globalMinPage) pageNum = globalMinPage;
+      if (pageNum > globalMaxPage) pageNum = globalMaxPage;
+      currentPage = pageNum;
+
+      // Reset zoom & pan each time we load a new page
+      scale = 1.0;
+      offsetX = 0;
+      offsetY = 0;
+
+      const container = document.getElementById('imageContainer');
+      container.innerHTML = ''; // clear old page
+
+      const img = document.createElement('img');
+      img.id = 'pageImage';
+      img.src = "bible/page_" + currentPage + ".jpg";
+      img.alt = "Page " + currentPage;
+
+      // Start transform as no offset, scale(1)
+      img.style.transform = `translate(0px, 0px) scale(1)`;
+
+      container.appendChild(img);
+      console.log("Displaying page:", currentPage);
+    }
+
+    /*********************************************
+     * FOOTER BAR EVENTS
+     *********************************************/
+    document.getElementById("backBtn").addEventListener("click", () => {
+      if (currentPage > globalMinPage) {
+        showPage(currentPage - 1);
+      } else {
+        alert("You are at the earliest page!");
+      }
+    });
+
+    document.getElementById("menuBtn").addEventListener("click", openBookModal);
+
+    document.getElementById("nextBtn").addEventListener("click", () => {
+      if (currentPage < globalMaxPage) {
+        showPage(currentPage + 1);
+      } else {
+        alert("You are at the last page!");
+      }
+    });
+
+    document.getElementById("aboutBtn").addEventListener("click", openAboutModal);
+
+    /*********************************************
+     * BOOK & CHAPTER MODALS
+     *********************************************/
+    function openBookModal() {
+      const modal = document.getElementById('bookModal');
+      const bookListDiv = document.getElementById('bookList');
+      bookListDiv.innerHTML = '';
+
+      if (!bibleData) {
+        bookListDiv.innerHTML = '<p>Error: Bible data not loaded.</p>';
+      } else {
+        bibleData.forEach(book => {
+          let amName = amharicBookNames[book.bookName] || book.bookName;
+          let btn = document.createElement('button');
+          btn.className = 'list-btn';
+          btn.textContent = amName;
+          btn.onclick = () => {
+            closeBookModal();
+            openChapterModal(book);
+          };
+          bookListDiv.appendChild(btn);
+        });
+      }
+      modal.style.display = 'block';
+    }
+    function closeBookModal() {
+      document.getElementById('bookModal').style.display = 'none';
+    }
+
+    function openChapterModal(book) {
+      const modal = document.getElementById('chapterModal');
+      const chapterListDiv = document.getElementById('chapterList');
+      chapterListDiv.innerHTML = '';
+
+      book.chapters.forEach(ch => {
+        const chBtn = document.createElement('button');
+        chBtn.className = 'list-btn';
+        chBtn.textContent = "Chapter " + ch.chapterNumber;
+        chBtn.onclick = () => {
+          showPage(ch.startPage);
+          closeChapterModal();
+        };
+        chapterListDiv.appendChild(chBtn);
+      });
+      modal.style.display = 'block';
+    }
+    function closeChapterModal() {
+      document.getElementById('chapterModal').style.display = 'none';
+    }
+
+    // Close modals on outside click
+    window.onclick = function(e) {
+      let bm = document.getElementById('bookModal');
+      let cm = document.getElementById('chapterModal');
+      let am = document.getElementById('aboutModal');
+      if (e.target === bm) bm.style.display = 'none';
+      if (e.target === cm) cm.style.display = 'none';
+      if (e.target === am) am.style.display = 'none';
+    };
+
+    /*********************************************
+     * ABOUT US MODAL
+     *********************************************/
+    function openAboutModal() {
+      document.getElementById('aboutModal').style.display = 'block';
+    }
+    function closeAboutModal() {
+      document.getElementById('aboutModal').style.display = 'none';
+    }
+
+    /*********************************************
+     * PINCH + PAN GESTURES
+     *********************************************/
+    function initGestures() {
+      const container = document.getElementById('imageContainer');
+      container.addEventListener('pointerdown', onPointerDown);
+      container.addEventListener('pointermove', onPointerMove);
+      container.addEventListener('pointerup', onPointerUp);
+      container.addEventListener('pointercancel', onPointerUp);
+      container.addEventListener('pointerleave', onPointerUp);
+
+      // Ctrl + wheel for zoom on desktop
+      container.addEventListener('wheel', (e) => {
+        if (e.ctrlKey) {
+          e.preventDefault();
+          const zoomFactor = (e.deltaY < 0) ? 1.1 : 0.9;
+          applyScale(scale * zoomFactor);
+        }
+      }, { passive: false });
+
+      // Touch pinch
+      container.addEventListener('touchstart', (e) => {
+        if (e.touches.length === 2) {
+          e.preventDefault();
+          startScale = scale;
+          startDistance = getTouchDistance(e);
+        }
+      }, { passive: false });
+
+      container.addEventListener('touchmove', (e) => {
+        if (e.touches.length === 2) {
+          e.preventDefault();
+          let newDistance = getTouchDistance(e);
+          let pinchRatio = newDistance / startDistance;
+          applyScale(startScale * pinchRatio);
+        }
+      }, { passive: false });
+    }
+
+    function onPointerDown(e) {
+      // Only start panning if single pointer (1 finger / 1 mouse)
+      if (activePointerId === null) {
+        activePointerId = e.pointerId;
+        pointerStartX = e.clientX;
+        pointerStartY = e.clientY;
+        startOffsetX = offsetX;
+        startOffsetY = offsetY;
+
+        const container = document.getElementById('imageContainer');
+        container.setPointerCapture(e.pointerId);
+      }
+    }
+
+    function onPointerMove(e) {
+      if (activePointerId === e.pointerId) {
+        // user is dragging
+        let dx = e.clientX - pointerStartX;
+        let dy = e.clientY - pointerStartY;
+
+        offsetX = startOffsetX + dx;
+        offsetY = startOffsetY + dy;
+        updateTransform();
+      }
+    }
+
+    function onPointerUp(e) {
+      if (activePointerId === e.pointerId) {
+        activePointerId = null;
+        const container = document.getElementById('imageContainer');
+        container.releasePointerCapture(e.pointerId);
+      }
+    }
+
+    // Distance between two touches
+    function getTouchDistance(e) {
+      const [t1, t2] = e.touches;
+      const dx = t2.clientX - t1.clientX;
+      const dy = t2.clientY - t1.clientY;
+      return Math.sqrt(dx*dx + dy*dy);
+    }
+
+    function applyScale(newScale) {
+      newScale = Math.max(0.3, Math.min(newScale, 5.0));
+      scale = newScale;
+      updateTransform();
+    }
+
+    function updateTransform() {
+      const pageImage = document.getElementById('pageImage');
+      if (pageImage) {
+        pageImage.style.transform = `translate(${offsetX}px, ${offsetY}px) scale(${scale})`;
+      }
+    }
+  </script>
+</body>
+</html>
